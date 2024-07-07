@@ -7,4 +7,6 @@ add_executable(MyTinyWebServer main.cpp
         Config.cpp
         Config.h
         lock/lockDefine.h
-        log/block_queue.h)
+        log/block_queue.h
+        log/log.cpp
+        log/log.h)
