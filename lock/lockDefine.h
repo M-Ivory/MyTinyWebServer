@@ -50,9 +50,9 @@ private:
     sem_t my_sem{};
 };
 
-class lock {// 互斥锁类
+class locker {// 互斥锁类
 public:
-    lock() {
+    locker() {
         // int pthread_mutex_init(pthread_mutex_t *restrict mutex,const pthread_mutexattr_t *restrict attr);
         // 函数是以动态方式创建互斥锁的，参数attr指定了新建互斥锁的属性。如果参数attr为空(NULL)，则使用默认的互斥锁属性，默认属性为快速互斥锁。
         // 互斥锁的属性在创建锁的时候指定，在LinuxThreads实现中仅有一个锁类型属性，不同的锁类型在试图对一个已经被锁定的互斥锁加锁时表现不同。
@@ -60,7 +60,7 @@ public:
         if(pthread_mutex_init(&my_mutex, NULL) != 0)
             throw std::exception();
     }
-    ~lock() {
+    ~locker() {
         pthread_mutex_destroy(&my_mutex);
     }
     bool lock() {
@@ -90,7 +90,7 @@ public:
         return pthread_cond_wait(&my_cond, mutex) == 0;
     }
     bool timewait(pthread_mutex_t *mutex, struct timespec t) {// timespec结构体中有两个变量，一个s一个ns
-        return pthread_cond_timewait(&my_cond, mutex, t) == 0;
+        return pthread_cond_timedwait(&my_cond, mutex, &t) == 0;// timedwait中的t为 系统时间 + 等待时机，即当前时间之后多少s，即now的基础上加多少，若超过则不等待
     }
     bool signal() {// 单播
         return pthread_cond_signal(&my_cond) == 0;
