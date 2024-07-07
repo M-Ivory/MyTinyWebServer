@@ -4,6 +4,7 @@
 
 #ifndef LOCKDEFINE_H
 #define LOCKDEFINE_H
+
 #include <exception>
 #include <semaphore.h>
 #include <pthread.h>
