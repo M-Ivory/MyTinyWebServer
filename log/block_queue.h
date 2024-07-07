@@ -5,6 +5,7 @@
 #ifndef BLOCK_QUEUE_H
 #define BLOCK_QUEUE_H
 #include <sys/time.h>
+#include <pthread.h>
 #include <iostream>
 #include "../lock/lockDefine.h"
 using namespace std;
