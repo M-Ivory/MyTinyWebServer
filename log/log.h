@@ -11,12 +11,16 @@
 
 using namespace std;
 class Log {
+    // 同步为生成日志即写入日志文件
+    // 异步为生成日志先不写入，写放入日志队列中，在清空日志线程时一并写入
 public:
     static Log* get_instance() {// 此函数用于获取一个Log实例，因为Log的构造函数为private
         static Log instance;
         return &instance;
     }
-    static void* flush_log_thread(void* args) {// 调用private写日志函数，执行异步日志写操作
+    static void* flush_log_thread(void* args) {
+        // flush清空日志队列中存储的日志，异步时使用
+        // 调用private写日志函数，执行异步日志写操作
         Log::get_instance()->async_write_log();
     }
     bool init(const char* file_name, int close_log, int log_buf_size = 8192, int log_max_lines = 5000000, int max_queue_size = 0);
@@ -31,7 +35,7 @@ private:
     // virtual的作用是，倘若有个子类继承Log，delete删除子类对象时，
     // 若无virtual，则会只调用父类中的析构函数～Log，而不会调用子类的析构函数
     // 若有virtual，则会先调用子类的析构函数，后调用父类中的析构函数～Log
-    void* async_write_log() {// 此函数将队列中一条日志写入文件
+    void* async_write_log() {// 此函数将日志队列中所有日志逐条写入文件
         string single_log;
         while(my_log_queue->pop(single_log)) {
             my_lock.lock();
@@ -42,7 +46,7 @@ private:
 private:
     char dir_name[128];// 路径名
     char log_name[128];// 日志名
-    int my_log_max_lines;// 日志最大行数
+    int my_single_log_max_lines;// 单个日志文件最大行数，若超过这个数，则需要新建一个日志文件
     int my_log_buf_size;// 日志缓冲区大小
     long long my_log_count;// 记录日志行数
     int my_today;// 记录当天
