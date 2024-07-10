@@ -9,4 +9,6 @@ add_executable(MyTinyWebServer main.cpp
         lock/lockDefine.h
         log/block_queue.h
         log/log.cpp
-        log/log.h)
+        log/log.h
+        mysql_pool/sql_connection_pool.cpp
+        mysql_pool/sql_connection_pool.h)
