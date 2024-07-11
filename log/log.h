@@ -14,7 +14,9 @@ class Log {
     // 同步为生成日志即写入日志文件
     // 异步为生成日志先不写入，写放入日志队列中，在清空日志线程时一并写入
 public:
-    static Log* get_instance() {// 此函数用于获取一个Log实例，因为Log的构造函数为private
+    // 使用static来获取一个Log的原因是，使得只有一个Log例子
+    static Log* get_instance() {
+        // 此函数用于获取一个Log实例，因为Log的构造函数为private
         static Log instance;
         return &instance;
     }
@@ -57,6 +59,7 @@ private:
     bool is_async;// 是否异步标志
     locker my_lock;// 互斥锁
     int my_close_log;// 关闭日志
+
 };
 
 // 宏定义，可以直接调用Log
@@ -65,9 +68,11 @@ private:
 // 而##__VA_ARGS__中##的作用
 // 在某些情况下，如果没有传递任何可变参数，那么在宏展开时会出现一个多余的逗号。为了避免这种情况，使用##操作符可以在__VA_ARGS__为空时删除前面的逗号。
 
-#define LOG_DEBUG(format, ...) if(0 == Log::get_instance()->m_close_log) {Log::get_instance()->write_log(0, format, ##__VA_ARGS__); Log::get_instance()->flush();}
-#define LOG_INFO(format, ...) if(0 == Log::get_instance()->m_close_log) {Log::get_instance()->write_log(1, format, ##__VA_ARGS__); Log::get_instance()->flush();}
-#define LOG_WARN(format, ...) if(0 == Log::get_instance()->m_close_log) {Log::get_instance()->write_log(2, format, ##__VA_ARGS__); Log::get_instance()->flush();}
-#define LOG_ERROR(format, ...) if(0 == Log::get_instance()->m_close_log) {Log::get_instance()->write_log(3, format, ##__VA_ARGS__); Log::get_instance()->flush();}
+#define LOG_DEBUG(format, ...) if(0 == my_close_log) {Log::get_instance()->write_log(0, format, ##__VA_ARGS__); Log::get_instance()->flush();}
+#define LOG_INFO(format, ...) if(0 == my_close_log) {Log::get_instance()->write_log(1, format, ##__VA_ARGS__); Log::get_instance()->flush();}
+#define LOG_WARN(format, ...) if(0 == my_close_log) {Log::get_instance()->write_log(2, format, ##__VA_ARGS__); Log::get_instance()->flush();}
+#define LOG_ERROR(format, ...) if(0 == my_close_log) {Log::get_instance()->write_log(3, format, ##__VA_ARGS__); Log::get_instance()->flush();}
+// 注意！此处的my_close_log为每个调用宏时的该类定义的my_close_log，并非log类中的，相当于全局变量，但每个类自己定义
+// 用于分辨在每个部分调用时，log是否打开
 
 #endif //LOG_H
