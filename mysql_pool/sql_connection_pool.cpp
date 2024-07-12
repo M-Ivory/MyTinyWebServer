@@ -71,10 +71,11 @@ bool connection_pool::release_connection(MYSQL *connection) {
     connection_list.push_back(connection);
     ++my_free_connections;
     --my_current_connections;
-    // reserve.post();// 对信号量+操作(V操作)，可用资源+1
+    reserve.post();// 对信号量+操作(V操作)，可用资源+1
+    // 此处进入临界区后增加资源数量，才调整信号量，例如根据某种条件决定是否允许更多线程访问资源，我认为信号量应放在锁里面
     my_lock.unlock();
 
-    reserve.post();// 对信号量+操作(V操作)，可用资源+1
+    // reserve.post();// 对信号量+操作(V操作)，可用资源+1
     return true;
 }
 

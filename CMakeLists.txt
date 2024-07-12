@@ -11,4 +11,6 @@ add_executable(MyTinyWebServer main.cpp
         log/log.cpp
         log/log.h
         mysql_pool/sql_connection_pool.cpp
-        mysql_pool/sql_connection_pool.h)
+        mysql_pool/sql_connection_pool.h
+        threadpool/threadpool.h
+        threadpool/threadpool.cpp)
