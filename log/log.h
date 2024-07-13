@@ -58,7 +58,7 @@ private:
     // 此处是类的指针，而队列在类中；是用指针应该是为了减少开销？
     bool is_async;// 是否异步标志
     locker my_lock;// 互斥锁
-    int my_close_log;// 关闭日志
+    int my_close_log;// 日志开关
 
 };
 
