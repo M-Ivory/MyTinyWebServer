@@ -15,4 +15,6 @@ add_executable(MyTinyWebServer main.cpp
         threadpool/threadpool.h
         threadpool/threadpool.cpp
         http/http_connection.cpp
-        http/http_connection.h)
+        http/http_connection.h
+        lst_timer/lst_timer.cpp
+        lst_timer/lst_timer.h)
