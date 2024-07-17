@@ -35,7 +35,7 @@ public:
     ~sort_timer_list();
 
     void add_timer(util_timer *timer);// 可用的加入定时器函数，因为head为私有变量
-    void adjust_timer(util_timer *timer);// 调整？排序？
+    void adjust_timer_list(util_timer *timer);// 调整list中序列不按expire升序排的
     void del_timer(util_timer *timer);// 删除定时器
     void tick();//
 private:
