@@ -89,8 +89,19 @@ void modfd(int epollfd, int fd, int ev, int TRIGMode) {
     // EPOLL_CTL_MOD: 修改已注册的文件描述符事件
 }
 
+// 定义两个static变量
 int http_connection::my_user_count = 0;
 int http_connection::my_epollfd = -1;
+
+// 关闭连接，关闭一个连接，客户总量减一
+void http_connection::close_conn(bool real_close) {
+    if(real_close && my_sockfd != -1) {
+        printf("close %d\n", my_sockfd);
+        removefd(my_epollfd, my_sockfd);
+        my_sockfd = -1;
+        my_user_count--;
+    }
+}
 
 // 初始化连接
 void http_connection::init(int sockfd, const sockaddr_in &addr, char *root,
@@ -106,20 +117,50 @@ void http_connection::init(int sockfd, const sockaddr_in &addr, char *root,
     init();
 }
 
-// 关闭连接，关闭一个连接，客户总量减一
-void http_connection::close_conn(bool real_close) {
-    if(real_close && my_sockfd != -1) {
-        printf("close %d\n", my_sockfd);
-        removefd(my_epollfd, my_sockfd);
-        my_sockfd = -1;
-        my_user_count--;
-    }
-}
-
+// 解析客户端发送的 HTTP 请求并根据请求生成合适的响应。
 void http_connection::process() {
+    HTTP_STATE read_ret = process_read();
+    if(read_ret == NO_REQUEST) {
+        modfd(my_epollfd, my_sockfd, EPOLLIN, my_trig_mode);
+        // 如果请求数据不完整，则重新注册 EPOLLIN 事件，使得该套接字在有新的数据到达时触发 epoll 事件，以继续读取数据
+        return;
+    }
+    bool write_ret = process_write(read_ret);// 生成 HTTP 响应报文并准备将其发送给客户端
+    if(!write_ret)close_conn();
+    // 响应生成成功
+    modfd(my_epollfd, my_sockfd, EPOLLOUT, my_trig_mode);
+    // EPOLLOUT，意味着该套接字准备好发送数据。
+    // 当 epoll 监听到 EPOLLOUT 事件时，表示套接字可以进行写操作，将响应报文发送给客户端
+
 }
 
 bool http_connection::read_once() {
+    if(my_read_buf_index >= READ_BUFF_SIZE)return false;
+    int bytes_read = 0;
+    // LT模式
+    // 此时只读一次数据
+    if(my_trig_mode == 0) {
+        // 从客户端socket读取数据，追加到读缓冲区
+        bytes_read = recv(my_sockfd, my_read_buf + my_read_buf_index,
+            READ_BUFF_SIZE - my_read_buf_index, 0);
+        my_read_buf_index += bytes_read;// 记录已读下表
+        if(bytes_read == 0)return false;// 读取失败
+        return true;
+    }else {// ET模式
+        // 循环读数据，直到数据读取完毕
+        while(true) {
+            bytes_read = recv(my_sockfd, my_read_buf + my_read_buf_index,
+            READ_BUFF_SIZE - my_read_buf_index, 0);
+            if(bytes_read == -1) {
+                if(errno == EAGAIN || errno == EWOULDBLOCK)break;
+                // 这意味着当前套接字没有更多的数据可读，或者写缓冲区已满，无法继续写入数据
+                return false;
+            }
+            if(bytes_read == 0)return false;
+            my_read_buf_index += bytes_read;
+        }
+        return true;
+    }
 }
 
 bool http_connection::write() {
@@ -136,13 +177,81 @@ http_connection::HTTP_STATE http_connection::process_read() {
 bool http_connection::process_write(HTTP_STATE ret) {
 }
 
+// 解析http请求行
 http_connection::HTTP_STATE http_connection::parse_request_line(char *text) {
+    my_url = strpbrk(text, " \t");// 查找第一个空格或tab符
+
+    // 分辨http请求的请求头
+    if(!my_url)return BAD_REQUEST;
+    *my_url++ = '\0';
+    char* method = text;
+    if(strcasecmp(method, "GET") == 0)my_method = GET;
+    else if(strcasecmp(method, "POST") == 0) {
+        my_method = POST;
+        cgi = 1;
+    }else return BAD_REQUEST;
+
+    // 分辨http请求的版本
+    my_url += strspn(my_url, " \t");
+    my_version = strpbrk(my_url, " \t");
+    if(!my_version)return BAD_REQUEST;
+    *my_version = '\0';
+
+    // 比较HTTP版本是否为HTTP/1.1
+    if (strcasecmp(my_version, "HTTP/1.1") != 0) return BAD_REQUEST;
+
+    // 比较URL前缀，跳过http://或https://
+    if (strncasecmp(my_url, "http://", 7) == 0){
+        my_url += 7;
+        my_url = strchr(my_url, '/');
+    }
+    if (strncasecmp(my_url, "https://", 8) == 0){
+        my_url += 8;
+        my_url = strchr(my_url, '/');
+    }
+    if (!my_url || my_url[0] != '/')return BAD_REQUEST;
+
+    // 解析完请求行后，状态机切换到解析请求头状态
+    my_check_state = HEADER;
+    return NO_REQUEST;
+
 }
 
+// 解析http请求头
 http_connection::HTTP_STATE http_connection::parse_headers(char *text) {
+    if(text[0] == '\0') {// 空请求头
+        if(my_content_length != 0) {
+            my_check_state = CONTENT;
+            return NO_REQUEST;
+        }
+        return GET_REQUEST;
+    }else if(strncasecmp(text, "Connection:", 11) == 0) {
+        text += 11;
+        text += strspn(text, " \t");
+        if (strcasecmp(text, "keep-alive") == 0)my_linger = true;// 表示可持续连接
+    }
+    else if (strncasecmp(text, "Content-Length:", 15) == 0) {
+        text += 15;
+        text += strspn(text, " \t");
+        my_content_length = atol(text);// 如果Content-Length不为0，则进入请求体解析状态
+    }
+    else if (strncasecmp(text, "Host:", 5) == 0) {
+        text += 5;
+        text += strspn(text, " \t");
+        my_host = text;// 保存请求头的HOST字段
+    }else LOG_INFO("oop!unknow header: %s", text);
+    return NO_REQUEST;
 }
 
+// 解析HTTP请求内容
 http_connection::HTTP_STATE http_connection::parse_content(char *text) {
+    if (my_read_buf_index >= (my_content_length + my_checked_idx))
+    {
+        text[my_content_length] = '\0';
+        my_string = text;
+        return GET_REQUEST;
+    }
+    return NO_REQUEST;
 }
 
 http_connection::HTTP_STATE http_connection::do_request() {

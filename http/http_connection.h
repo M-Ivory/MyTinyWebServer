@@ -85,7 +85,7 @@ private:
     char *my_version;// http版本
     char *my_host;// host字段
     long my_content_length;// 内容长度
-    bool my_linger;// 表示http的连接状态
+    bool my_linger;// 表示http的连接状态 Keep-Alive可持续连接
     char *my_file_address;// 文件的内存映射地址
     struct stat my_file_stat;// 请求文件的状态信息
     struct iovec my_iv[2];// 向量 I/O 操作中的缓冲区
